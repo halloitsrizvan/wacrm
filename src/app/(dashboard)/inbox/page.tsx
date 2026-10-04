@@ -271,6 +271,13 @@ function InboxPageInner() {
           prev.map((m) => (m.id === newMsg.id ? { ...m, ...newMsg } : m))
         );
       }
+
+      if (event.eventType === "DELETE") {
+        const deletedId = event.old?.id;
+        if (deletedId) {
+          setMessages((prev) => prev.filter((m) => m.id !== deletedId));
+        }
+      }
     },
     [activeConversation, hydrateConversation]
   );
@@ -522,6 +529,10 @@ function InboxPageInner() {
     []
   );
 
+  const handleDeleteMessage = useCallback((id: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+  }, []);
+
   const handleStatusChange = useCallback(
     (conversationId: string, status: ConversationStatus) => {
       setConversations((prev) =>
@@ -616,6 +627,7 @@ function InboxPageInner() {
             onMessagesLoaded={handleMessagesLoaded}
             onNewMessage={handleNewMessage}
             onUpdateMessage={handleUpdateMessage}
+            onDeleteMessage={handleDeleteMessage}
             onStatusChange={handleStatusChange}
             onAssignChange={handleAssignChange}
             onBack={handleCloseConversation}

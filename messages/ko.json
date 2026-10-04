@@ -183,7 +183,13 @@
       "sendTemplateFailed": "템플릿 전송 실패: {reason}",
       "waitForSending": "메시지 전송이 끝날 때까지 기다려 주세요",
       "reactionFailed": "반응 추가 실패: {reason}",
-      "assignmentUpdateFailed": "담당자 변경에 실패했습니다"
+      "assignmentUpdateFailed": "담당자 변경에 실패했습니다",
+      "deleteMessageTitle": "메시지 삭제",
+      "deleteMessageDescription": "이 메시지를 CRM에서 삭제하시겠습니까? (참고: Meta WhatsApp API는 상대방 기기에서 메시지를 삭제하거나 취소하는 기능을 지원하지 않습니다.)",
+      "messageDeleted": "메시지가 삭제되었습니다",
+      "deleteFailed": "메시지 삭제 실패: {reason}",
+      "messageUpdated": "메시지가 수정되었습니다",
+      "updateFailed": "메시지 수정 실패: {reason}"
     },
     "sessionTimer": {
       "expired": "만료됨",
@@ -264,12 +270,16 @@
     "actions": {
       "reply": "답장",
       "copyText": "텍스트 복사",
+      "edit": "수정",
       "delete": "삭제",
       "react": "반응 남기기",
       "reactWith": "{emoji}(으)로 반응하기",
       "nothingToCopy": "복사할 내용이 없습니다",
       "copied": "복사됨",
-      "copyFailed": "복사 실패"
+      "copyFailed": "복사 실패",
+      "cancel": "취소",
+      "save": "저장",
+      "editHint": "취소는 Esc • 저장은 Ctrl+Enter"
     },
     "replyQuote": {
       "photo": "[사진]",

@@ -27,10 +27,20 @@ import {
   RefreshCw,
   PanelRightOpen,
   PanelRightClose,
+  Trash2,
 } from "lucide-react";
 import { format, isToday, isYesterday, differenceInHours } from "date-fns";
 import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +64,7 @@ import { AiThreadBanner } from "./ai-thread-banner";
 import { buildReplyPreview } from "./reply-quote";
 import { renderTemplateBody } from "@/lib/whatsapp/template-body";
 import { contactHandle } from "@/lib/whatsapp/wa-identity";
+import { useCan } from "@/hooks/use-can";
 import { toast } from "sonner";
 
 interface ReplyDraft {
@@ -69,6 +80,7 @@ interface MessageThreadProps {
   onMessagesLoaded: (messages: Message[]) => void;
   onNewMessage: (message: Message) => void;
   onUpdateMessage: (id: string, updates: Partial<Message>) => void;
+  onDeleteMessage?: (id: string) => void;
   onStatusChange: (conversationId: string, status: ConversationStatus) => void;
   onAssignChange: (
     conversationId: string,
@@ -157,6 +169,7 @@ export function MessageThread({
   onMessagesLoaded,
   onNewMessage,
   onUpdateMessage,
+  onDeleteMessage,
   onStatusChange,
   onAssignChange,
   onBack,
@@ -166,16 +179,21 @@ export function MessageThread({
   onToggleContactPanel,
 }: MessageThreadProps) {
   const t = useTranslations("Inbox.messageThread");
+  const tActions = useTranslations("Inbox.actions");
   const tTimer = useTranslations("Inbox.sessionTimer");
   const tQuote = useTranslations("Inbox.replyQuote");
 
   const { user } = useAuth();
+  const canManage = useCan("send-messages");
   const { getPresence, getRow, now } = usePresence();
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   // Purely visual spin state for the manual-refresh button. The actual
   // refetch is fire-and-forget through `onRefresh` (which bumps the
   // parent's resyncToken); the 700ms spin is just feedback so the click
@@ -862,6 +880,122 @@ export function MessageThread({
     [conversation, onAssignChange, t],
   );
 
+  const handleStartEdit = useCallback((msg: Message) => {
+    setEditingMessageId(msg.id);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessageId(null);
+  }, []);
+
+  const handleSaveEdit = useCallback(
+    async (messageId: string, newText: string) => {
+      if (!conversation) return;
+      const target = messages.find((m) => m.id === messageId);
+      if (!target) return;
+      const oldText = target.content_text;
+
+      // Optimistic update
+      onUpdateMessage(messageId, { content_text: newText });
+      setEditingMessageId(null);
+
+      if (messageId.startsWith("temp-")) return;
+
+      try {
+        const supabase = createClient();
+        const { error } = await supabase
+          .from("messages")
+          .update({ content_text: newText })
+          .eq("id", messageId);
+
+        if (error) {
+          console.error("Failed to update message:", error);
+          toast.error(t("updateFailed", { reason: error.message }));
+          onUpdateMessage(messageId, { content_text: oldText });
+          return;
+        }
+
+        toast.success(t("messageUpdated"));
+
+        // If this was the last message in the thread, update conversation preview
+        if (messages[messages.length - 1]?.id === messageId) {
+          await supabase
+            .from("conversations")
+            .update({ last_message_text: newText })
+            .eq("id", conversation.id);
+        }
+      } catch (err) {
+        console.error("Failed to update message:", err);
+        const reason = err instanceof Error ? err.message : "network error";
+        toast.error(t("updateFailed", { reason }));
+        onUpdateMessage(messageId, { content_text: oldText });
+      }
+    },
+    [conversation, messages, onUpdateMessage, t],
+  );
+
+  const handlePromptDelete = useCallback((msg: Message) => {
+    setMessageToDelete(msg);
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!messageToDelete || !conversation) return;
+    const msgId = messageToDelete.id;
+    const convId = conversation.id;
+    setIsDeleting(true);
+
+    // Optimistic delete
+    if (onDeleteMessage) {
+      onDeleteMessage(msgId);
+    }
+    setMessageToDelete(null);
+
+    if (msgId.startsWith("temp-")) {
+      setIsDeleting(false);
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("messages")
+        .delete()
+        .eq("id", msgId);
+
+      if (error) {
+        console.error("Failed to delete message:", error);
+        toast.error(t("deleteFailed", { reason: error.message }));
+        // Refetch to restore
+        const { data } = await supabase
+          .from("messages")
+          .select("*")
+          .eq("conversation_id", convId)
+          .order("created_at", { ascending: true });
+        if (data) onMessagesLoadedRef.current(data);
+        return;
+      }
+
+      toast.success(t("messageDeleted"));
+
+      // If deleted message was the last message, update conversation preview
+      const remaining = messages.filter((m) => m.id !== msgId);
+      const lastMsg = remaining[remaining.length - 1];
+      await supabase
+        .from("conversations")
+        .update({
+          last_message_text: lastMsg?.content_text ?? "",
+          last_message_at: lastMsg?.created_at ?? conversation.created_at,
+        })
+        .eq("id", convId);
+    } catch (err) {
+      console.error("Failed to delete message:", err);
+      const reason = err instanceof Error ? err.message : "network error";
+      toast.error(t("deleteFailed", { reason }));
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [conversation, messageToDelete, messages, onDeleteMessage, t]);
+
   // Empty state — same WhatsApp-style doodle background as the active
   // thread below, so swapping between empty/selected doesn't change the
   // pattern under the user's eye.
@@ -1133,6 +1267,10 @@ export function MessageThread({
                       const next = own?.emoji === emoji ? "" : emoji;
                       void postReaction(msg.id, next);
                     };
+                    const isMsgEditing = editingMessageId === msg.id;
+                    const isEditable = canManage && (msg.content_type === "text" || Boolean(msg.content_text));
+                    const isDeletable = canManage;
+
                     return (
                       <MessageActions
                         key={msg.id}
@@ -1141,6 +1279,10 @@ export function MessageThread({
                         onReact={(emoji) => {
                           if (emoji) void postReaction(msg.id, emoji);
                         }}
+                        onEdit={isEditable ? () => handleStartEdit(msg) : undefined}
+                        onDelete={isDeletable ? () => handlePromptDelete(msg) : undefined}
+                        canEdit={isEditable}
+                        canDelete={isDeletable}
                       >
                         <MessageBubble
                           message={msg}
@@ -1149,6 +1291,9 @@ export function MessageThread({
                           currentUserId={user?.id}
                           onToggleReaction={handlePillToggle}
                           onOpenMedia={handleMediaChange}
+                          isEditing={isMsgEditing}
+                          onSaveEdit={(newText) => handleSaveEdit(msg.id, newText)}
+                          onCancelEdit={handleCancelEdit}
                         />
                       </MessageActions>
                     );
@@ -1193,6 +1338,56 @@ export function MessageThread({
         onOpenChange={setTemplateModalOpen}
         onSelect={handleSendTemplate}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!messageToDelete}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setMessageToDelete(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              {t("deleteMessageTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("deleteMessageDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          {messageToDelete?.content_text && (
+            <div className="my-2 max-h-32 overflow-y-auto rounded-md border border-border bg-muted/50 p-2.5 text-xs text-muted-foreground">
+              <p className="whitespace-pre-wrap break-words italic">
+                &ldquo;{messageToDelete.content_text}&rdquo;
+              </p>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMessageToDelete(null)}
+              disabled={isDeleting}
+            >
+              {tActions("cancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <div className="mr-1 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <Trash2 className="mr-1 h-4 w-4" />
+              )}
+              {tActions("delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Full-size viewer for the thread's images/videos. Renders nothing
           until a bubble opens it. */}

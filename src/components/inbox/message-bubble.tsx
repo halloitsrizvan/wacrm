@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import type { Message, MessageReaction } from "@/types";
 import {
@@ -38,6 +39,9 @@ interface MessageBubbleProps {
    * stays inline and non-clickable.
    */
   onOpenMedia?: (messageId: string) => void;
+  isEditing?: boolean;
+  onSaveEdit?: (newText: string) => void;
+  onCancelEdit?: () => void;
 }
 
 /**
@@ -245,12 +249,28 @@ export function MessageBubble({
   currentUserId,
   onToggleReaction,
   onOpenMedia,
+  isEditing = false,
+  onSaveEdit,
+  onCancelEdit,
 }: MessageBubbleProps) {
   const t = useTranslations("Inbox.bubble");
+  const tActions = useTranslations("Inbox.actions");
+
+  const [editText, setEditText] = useState(message.content_text ?? "");
+
+  useEffect(() => {
+    setEditText(message.content_text ?? "");
+  }, [message.content_text, isEditing]);
 
   const isAgent = message.sender_type === "agent" || message.sender_type === "bot";
   const time = format(new Date(message.created_at), "HH:mm");
   const failure = isAgent ? failureReason(message) : null;
+
+  const handleSave = () => {
+    const trimmed = editText.trim();
+    if (!trimmed) return;
+    onSaveEdit?.(trimmed);
+  };
 
   // Row alignment + width cap are owned by <MessageActions> so its hover
   // group matches the bubble's content area, not the full row.
@@ -269,52 +289,120 @@ export function MessageBubble({
             : "rounded-bl-md bg-muted text-foreground",
         )}
       >
-        {reply && (
-          <ReplyQuote
-            authorLabel={reply.authorLabel}
-            preview={reply.preview}
-            onPrimary={isAgent}
-          />
-        )}
-        <MessageContent
-          message={message}
-          t={t}
-          isAgent={isAgent}
-          onOpenMedia={onOpenMedia}
-        />
-        <div
-          className={cn(
-            "mt-1 flex items-center gap-1",
-            isAgent ? "justify-end" : "justify-start",
-          )}
-        >
-          {/* AI badge — only on replies the auto-reply bot generated
-              (always outbound, so it sits on the primary fill). Lets
-              agents tell an AI reply from their own / a Flow's at a
-              glance. */}
-          {message.ai_generated && (
-            <span
-              className="inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/20 px-1.5 py-px text-[9px] font-semibold uppercase leading-none tracking-wide text-primary-foreground"
-              title={t("aiBadgeTitle")}
-            >
-              <Sparkles className="h-2.5 w-2.5" />
-              {t("aiBadge")}
-            </span>
-          )}
-          <span
-            className={cn(
-              "text-[10px]",
-              // Outbound bubbles sit on the primary fill, so the
-              // timestamp must read against that (not the neutral
-              // foreground) — otherwise it goes low-contrast in light
-              // mode. Inbound bubbles use the muted surface.
-              isAgent ? "text-primary-foreground/70" : "text-muted-foreground",
+        {isEditing ? (
+          <div className="flex flex-col gap-2 min-w-[220px] sm:min-w-[280px] py-0.5">
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  handleSave();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  onCancelEdit?.();
+                }
+              }}
+              rows={Math.min(8, Math.max(2, editText.split("\n").length))}
+              className={cn(
+                "w-full rounded-md border p-2 text-sm focus:outline-none focus:ring-1 resize-y",
+                isAgent
+                  ? "border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground placeholder:text-primary-foreground/60 focus:ring-primary-foreground/50"
+                  : "border-border bg-background text-foreground focus:ring-ring"
+              )}
+              autoFocus
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span
+                className={cn(
+                  "text-[10px]",
+                  isAgent
+                    ? "text-primary-foreground/70"
+                    : "text-muted-foreground"
+                )}
+              >
+                {tActions("editHint")}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={onCancelEdit}
+                  className={cn(
+                    "rounded px-2 py-1 text-xs font-medium transition-colors",
+                    isAgent
+                      ? "text-primary-foreground/80 hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  {tActions("cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!editText.trim()}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-semibold shadow-sm transition-colors disabled:opacity-50",
+                    isAgent
+                      ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90"
+                  )}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {tActions("save")}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {reply && (
+              <ReplyQuote
+                authorLabel={reply.authorLabel}
+                preview={reply.preview}
+                onPrimary={isAgent}
+              />
             )}
-          >
-            {time}
-          </span>
-          {isAgent && <StatusIcon status={message.status} title={failure} />}
-        </div>
+            <MessageContent
+              message={message}
+              t={t}
+              isAgent={isAgent}
+              onOpenMedia={onOpenMedia}
+            />
+            <div
+              className={cn(
+                "mt-1 flex items-center gap-1",
+                isAgent ? "justify-end" : "justify-start",
+              )}
+            >
+              {/* AI badge — only on replies the auto-reply bot generated
+                  (always outbound, so it sits on the primary fill). Lets
+                  agents tell an AI reply from their own / a Flow's at a
+                  glance. */}
+              {message.ai_generated && (
+                <span
+                  className="inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/20 px-1.5 py-px text-[9px] font-semibold uppercase leading-none tracking-wide text-primary-foreground"
+                  title={t("aiBadgeTitle")}
+                >
+                  <Sparkles className="h-2.5 w-2.5" />
+                  {t("aiBadge")}
+                </span>
+              )}
+              <span
+                className={cn(
+                  "text-[10px]",
+                  // Outbound bubbles sit on the primary fill, so the
+                  // timestamp must read against that (not the neutral
+                  // foreground) — otherwise it goes low-contrast in light
+                  // mode. Inbound bubbles use the muted surface.
+                  isAgent ? "text-primary-foreground/70" : "text-muted-foreground",
+                )}
+              >
+                {time}
+              </span>
+              {isAgent && <StatusIcon status={message.status} title={failure} />}
+            </div>
+          </>
+        )}
       </div>
       {failure && (
         <p

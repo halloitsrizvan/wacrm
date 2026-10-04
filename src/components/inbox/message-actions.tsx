@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { CornerUpLeft, Copy, SmilePlus } from "lucide-react";
+import { CornerUpLeft, Copy, Pencil, SmilePlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -20,6 +20,10 @@ interface MessageActionsProps {
   message: Message;
   onReply: () => void;
   onReact: (emoji: string) => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
   children: ReactNode;
 }
 
@@ -32,6 +36,10 @@ export function MessageActions({
   message,
   onReply,
   onReact,
+  onEdit,
+  onDelete,
+  canEdit = false,
+  canDelete = false,
   children,
 }: MessageActionsProps) {
   const t = useTranslations("Inbox.actions");
@@ -74,6 +82,20 @@ export function MessageActions({
   const handleReply = () => {
     onReply();
     setTouchOpen(false);
+  };
+
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit();
+      setTouchOpen(false);
+    }
+  };
+
+  const handleDelete = () => {
+    if (onDelete) {
+      onDelete();
+      setTouchOpen(false);
+    }
   };
 
   // Row alignment lives here (not in MessageBubble) so the `group/actions`
@@ -133,6 +155,7 @@ export function MessageActions({
           onClick={handleReply}
           className="flex h-5 w-5 items-center justify-center rounded-full text-popover-foreground hover:bg-muted hover:text-foreground"
           aria-label={t("reply")}
+          title={t("reply")}
         >
           <CornerUpLeft className="h-3.5 w-3.5" />
         </button>
@@ -141,9 +164,32 @@ export function MessageActions({
           onClick={handleCopy}
           className="flex h-5 w-5 items-center justify-center rounded-full text-popover-foreground hover:bg-muted hover:text-foreground"
           aria-label={t("copyText")}
+          title={t("copyText")}
         >
           <Copy className="h-3.5 w-3.5" />
         </button>
+        {canEdit && onEdit && (
+          <button
+            type="button"
+            onClick={handleEdit}
+            className="flex h-5 w-5 items-center justify-center rounded-full text-popover-foreground hover:bg-muted hover:text-foreground"
+            aria-label={t("edit")}
+            title={t("edit")}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {canDelete && onDelete && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="flex h-5 w-5 items-center justify-center rounded-full text-popover-foreground transition-colors hover:bg-destructive/15 hover:text-destructive"
+            aria-label={t("delete")}
+            title={t("delete")}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
       </div>
     </div>

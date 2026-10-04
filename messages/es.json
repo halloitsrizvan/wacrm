@@ -183,7 +183,13 @@
       "sendTemplateFailed": "Error al enviar la plantilla: {reason}",
       "waitForSending": "Espera a que el mensaje termine de enviarse",
       "reactionFailed": "Error en la reacción: {reason}",
-      "assignmentUpdateFailed": "Error al actualizar la asignación"
+      "assignmentUpdateFailed": "Error al actualizar la asignación",
+      "deleteMessageTitle": "Eliminar mensaje",
+      "deleteMessageDescription": "¿Estás seguro de que deseas eliminar este mensaje del CRM? Nota: La API de Meta WhatsApp no admite eliminar o revocar mensajes en el teléfono del destinatario.",
+      "messageDeleted": "Mensaje eliminado",
+      "deleteFailed": "Error al eliminar el mensaje: {reason}",
+      "messageUpdated": "Mensaje actualizado",
+      "updateFailed": "Error al actualizar el mensaje: {reason}"
     },
     "sessionTimer": {
       "expired": "Expirada",
@@ -264,12 +270,16 @@
     "actions": {
       "reply": "Responder",
       "copyText": "Copiar texto",
+      "edit": "Editar",
       "delete": "Eliminar",
       "react": "Reaccionar",
       "reactWith": "Reaccionar con {emoji}",
       "nothingToCopy": "Nada que copiar",
       "copied": "Copiado",
-      "copyFailed": "Error al copiar"
+      "copyFailed": "Error al copiar",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "editHint": "Esc para cancelar • Ctrl+Enter para guardar"
     },
     "replyQuote": {
       "photo": "[Foto]",

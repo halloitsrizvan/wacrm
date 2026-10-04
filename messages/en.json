@@ -183,7 +183,13 @@
       "sendTemplateFailed": "Failed to send template: {reason}",
       "waitForSending": "Wait for the message to finish sending",
       "reactionFailed": "Reaction failed: {reason}",
-      "assignmentUpdateFailed": "Failed to update assignment"
+      "assignmentUpdateFailed": "Failed to update assignment",
+      "deleteMessageTitle": "Delete message",
+      "deleteMessageDescription": "Are you sure you want to delete this message from the CRM? Note: Meta WhatsApp API does not support deleting or revoking messages on the recipient's phone.",
+      "messageDeleted": "Message deleted",
+      "deleteFailed": "Failed to delete message: {reason}",
+      "messageUpdated": "Message updated",
+      "updateFailed": "Failed to update message: {reason}"
     },
     "sessionTimer": {
       "expired": "Expired",
@@ -264,12 +270,16 @@
     "actions": {
       "reply": "Reply",
       "copyText": "Copy text",
+      "edit": "Edit",
       "delete": "Delete",
       "react": "React",
       "reactWith": "React with {emoji}",
       "nothingToCopy": "Nothing to copy",
       "copied": "Copied",
-      "copyFailed": "Copy failed"
+      "copyFailed": "Copy failed",
+      "cancel": "Cancel",
+      "save": "Save",
+      "editHint": "Esc to cancel • Ctrl+Enter to save"
     },
     "replyQuote": {
       "photo": "[Photo]",
